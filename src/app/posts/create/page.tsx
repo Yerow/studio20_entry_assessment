@@ -175,7 +175,7 @@ export default function CreatePost() {
                 maxLength={200}
               />
               <p className="mt-1 text-sm text-gray-500">
-                {formData.excerpt.length}/200 characters • If left empty, we'll auto-generate from your content
+                {formData.excerpt.length}/200 characters • If left empty, we will auto-generate from your content
               </p>
             </div>
 
