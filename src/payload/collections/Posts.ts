@@ -81,7 +81,7 @@ export const Posts: CollectionConfig = {
       },
       hooks: {
         beforeValidate: [
-          ({ value, originalDoc, data }) => {
+          ({ value, data }) => {
             if (data?.title && !value) {
               return data.title
                 .toLowerCase()

@@ -37,7 +37,8 @@ export default function SetupPage() {
       } else {
         setError(result.error || 'Failed to create admin user')
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Registration error:', error)
       setError('Network error occurred')
     } finally {
       setLoading(false)
@@ -116,9 +117,9 @@ export default function SetupPage() {
         </button>
 
         <div className="mt-6 text-center">
-          <a href="/" className="text-blue-600 hover:text-blue-700 text-sm">
+          <Link href="/" className="text-blue-600 hover:text-blue-700 text-sm">
             ← Back to Homepage
-          </a>
+          </Link>
         </div>
       </div>
     </div>

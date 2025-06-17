@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import clientPromise from '@/lib/mongodb'
-import { ObjectId } from 'mongodb'
 
 // GET all posts
 export async function GET() {

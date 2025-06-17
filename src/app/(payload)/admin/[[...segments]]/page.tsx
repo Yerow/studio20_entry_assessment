@@ -8,8 +8,26 @@ import Link from 'next/link'
 interface AdminStats {
   totalPosts: number
   totalUsers: number
-  recentPosts: any[]
-  recentUsers: any[]
+  recentPosts: BlogPost[]
+  recentUsers: User[]
+}
+
+interface BlogPost {
+  _id: string
+  title: string
+  content: string
+  author: {
+    name: string
+    email: string
+  }
+  createdAt: string
+}
+
+interface User {
+  _id: string
+  name: string
+  email: string
+  createdAt: string
 }
 
 export default function AdminPage() {
@@ -18,15 +36,6 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (status === 'loading') return
-    if (!session) {
-      router.push('/auth/signin')
-      return
-    }
-    loadAdminData()
-  }, [session, status])
 
   const loadAdminData = async () => {
     try {
@@ -66,6 +75,15 @@ export default function AdminPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (status === 'loading') return
+    if (!session) {
+      router.push('/auth/signin')
+      return
+    }
+    loadAdminData()
+  }, [session, status, router, loadAdminData])
 
   const deletePost = async (postId: string, postTitle: string) => {
     if (!confirm(`Are you sure you want to delete "${postTitle}"? This action cannot be undone.`)) {

@@ -10,7 +10,6 @@ import remarkGfm from 'remark-gfm'
 
 export default function PostDetail() {
   const params = useParams()
-  const router = useRouter()
   const [post, setPost] = useState<BlogPost | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
