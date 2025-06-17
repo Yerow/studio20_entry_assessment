@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -37,7 +37,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const loadAdminData = async () => {
+  const loadAdminData = useCallback(async () => {
     try {
       // Charger seulement les posts pour l'instant
       const postsRes = await fetch('/api/posts')
@@ -74,7 +74,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [session?.user?.name, session?.user?.email])
 
   useEffect(() => {
     if (status === 'loading') return
