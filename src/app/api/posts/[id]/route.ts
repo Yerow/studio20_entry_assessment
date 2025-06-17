@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
 import clientPromise from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 
@@ -43,6 +44,57 @@ export async function GET(
     console.error('Error fetching post:', error)
     return NextResponse.json(
       { error: 'Failed to fetch post' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession()
+    
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const { id } = await params
+
+    // Validate ObjectId format
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: 'Invalid post ID' },
+        { status: 400 }
+      )
+    }
+
+    const client = await clientPromise
+    const posts = client.db('blog20').collection('posts')
+    
+    const result = await posts.deleteOne({ 
+      _id: new ObjectId(id)
+    })
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { error: 'Post not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(
+      { message: 'Post deleted successfully' },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('Error deleting post:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete post' },
       { status: 500 }
     )
   }
