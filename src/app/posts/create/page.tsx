@@ -1,16 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+
+interface PayloadUser {
+  id: string
+  email: string
+  name?: string
+  role?: 'admin' | 'author' | 'user'
+}
 
 export default function CreatePost() {
-  const { data: session, status } = useSession()
+  const [user, setUser] = useState<PayloadUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const router = useRouter()
+  
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -18,15 +24,32 @@ export default function CreatePost() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [showPreview, setShowPreview] = useState(false)
 
-  // Redirect if not authenticated
+  // Vérifier l'authentification
   useEffect(() => {
-    if (status === 'loading') return // Still loading
-    if (!session) {
+    checkAuth()
+  }, [])
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/users/me', { 
+        credentials: 'include' 
+      })
+      
+      if (response.ok) {
+        const userData = await response.json()
+        setUser(userData)
+      } else {
+        // Pas connecté, rediriger vers signin
+        router.push('/auth/signin')
+      }
+    } catch (error) {
+      console.error('Auth check error:', error)
       router.push('/auth/signin')
+    } finally {
+      setAuthLoading(false)
     }
-  }, [session, status, router])
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -34,7 +57,6 @@ export default function CreatePost() {
       ...prev,
       [name]: value
     }))
-    // Clear error when user starts typing
     if (error) setError('')
   }
 
@@ -43,7 +65,7 @@ export default function CreatePost() {
     setLoading(true)
     setError('')
 
-    // Client-side validation
+    // Validation côté client
     if (!formData.title.trim() || !formData.content.trim()) {
       setError('Title and content are required')
       setLoading(false)
@@ -63,25 +85,34 @@ export default function CreatePost() {
     }
 
     try {
+      // Créer le post via l'API PayloadCMS
       const response = await fetch('/api/posts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Important pour l'auth PayloadCMS
         body: JSON.stringify({
           title: formData.title.trim(),
           content: formData.content.trim(),
-          excerpt: formData.excerpt.trim() || undefined
+          excerpt: formData.excerpt.trim() || undefined,
+          status: 'published', // Publier directement (ou 'draft' selon tes besoins)
+          author: user?.id, // Assigner l'auteur
+          publishedAt: new Date().toISOString(),
         }),
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        // Success! Redirect to home page
-        router.push('/')
+        // Succès ! Rediriger vers la homepage ou le post créé
+        if (data.doc && data.doc.id) {
+          router.push(`/posts/${data.doc.id}`)
+        } else {
+          router.push('/')
+        }
       } else {
-        setError(data.error || 'Failed to create post')
+        setError(data.errors?.[0]?.message || data.message || 'Failed to create post')
       }
     } catch (error) {
       console.error('Create post error:', error)
@@ -91,23 +122,23 @@ export default function CreatePost() {
     }
   }
 
-  // Show loading while checking authentication
-  if (status === 'loading') {
+  // Afficher loader pendant vérification auth
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <div className="flex items-center justify-center pt-20">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Loading...</p>
+            <p className="mt-2 text-gray-600">Checking authentication...</p>
           </div>
         </div>
       </div>
     )
   }
 
-  // Don't render anything if not authenticated (will redirect)
-  if (!session) {
+  // Ne pas afficher si pas authentifié (redirection en cours)
+  if (!user) {
     return null
   }
 
@@ -121,7 +152,7 @@ export default function CreatePost() {
             Create New Post
           </h1>
           <p className="text-gray-600">
-            Share your thoughts with the Blog 20 community
+            Share your thoughts with the Blog 20 community, {user.name}!
           </p>
         </div>
 
@@ -179,88 +210,33 @@ export default function CreatePost() {
               </p>
             </div>
 
-            {/* Content Field with Preview */}
+            {/* Content Field */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="content" className="block text-sm font-medium text-gray-700">
-                  Content * (Markdown supported)
-                </label>
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowPreview(false)}
-                    className={`px-3 py-1 text-sm rounded ${
-                      !showPreview 
-                        ? 'bg-blue-100 text-blue-700' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Write
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowPreview(true)}
-                    className={`px-3 py-1 text-sm rounded ${
-                      showPreview 
-                        ? 'bg-blue-100 text-blue-700' 
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Preview
-                  </button>
-                </div>
-              </div>
-              
-              {!showPreview ? (
-                <textarea
-                  id="content"
-                  name="content"
-                  required
-                  rows={12}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical font-mono text-sm"
-                  placeholder="Write your blog post content here using Markdown...
+              <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+                Content *
+              </label>
+              <textarea
+                id="content"
+                name="content"
+                required
+                rows={12}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+                placeholder="Write your blog post content here...
 
-# This is a heading
-## This is a subheading
+You can use simple formatting:
 
-**Bold text** and *italic text*
+**Bold text**
+*Italic text*
 
-- Bullet point
-- Another bullet point
+- Bullet points
+- Another point
 
-```javascript
-// Code blocks are supported too!
-console.log('Hello world');
-```
-
-[Link to somewhere](https://example.com)"
-                  value={formData.content}
-                  onChange={handleInputChange}
-                />
-              ) : (
-                <div className="w-full min-h-[300px] px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                  {formData.content ? (
-                    <div className="markdown-body">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {formData.content}
-                      </ReactMarkdown>
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 italic">Preview will appear here when you start writing...</p>
-                  )}
-                </div>
-              )}
-              
+Or just write in plain text!"
+                value={formData.content}
+                onChange={handleInputChange}
+              />
               <p className="mt-1 text-sm text-gray-500">
-                {formData.content.length} characters • Minimum 10 characters required • 
-                <a 
-                  href="https://www.markdownguide.org/basic-syntax/" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-blue-600 hover:text-blue-700 ml-1"
-                >
-                  Markdown guide
-                </a>
+                {formData.content.length} characters • Minimum 10 characters required
               </p>
             </div>
 
@@ -306,28 +282,15 @@ console.log('Hello world');
           </form>
         </div>
 
-        {/* Tips Section */}
+        {/* Info Section */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">✍️ Writing Tips & Markdown</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-sm font-medium text-blue-800 mb-1">Writing Tips:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Start with an engaging title</li>
-                <li>• Write in a conversational tone</li>
-                <li>• Use headings to organize content</li>
-                <li>• Share personal experiences</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium text-blue-800 mb-1">Markdown Examples:</h4>
-              <ul className="text-sm text-blue-700 space-y-1 font-mono">
-                <li>• # Heading or ## Subheading</li>
-                <li>• **bold** and *italic*</li>
-                <li>• `code` and ```code blocks```</li>
-                <li>• [links](url) and lists with -</li>
-              </ul>
-            </div>
+          <h3 className="text-sm font-medium text-blue-800 mb-2">
+            ✨ Publishing with PayloadCMS
+          </h3>
+          <div className="text-sm text-blue-700 space-y-1">
+            <p>• Your post will be published immediately and visible to all visitors</p>
+            <p>• You can edit or delete your posts anytime</p>
+            <p>• Admins can access advanced editing features in the <Link href="/admin" className="underline">admin panel</Link></p>
           </div>
         </div>
       </div>

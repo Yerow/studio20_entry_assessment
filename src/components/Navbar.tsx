@@ -1,15 +1,63 @@
 'use client'
 
-import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+interface PayloadUser {
+  id: string
+  email: string
+  name?: string // Optionnel car peut être manquant
+  role?: 'admin' | 'author' | 'user' // Optionnel aussi
+}
 
 export default function Navbar() {
-  const { data: session, status } = useSession()
+  const [user, setUser] = useState<PayloadUser | null>(null)
+  const [loading, setLoading] = useState(true)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: '/' })
+  // Vérifier l'auth au chargement
+  useEffect(() => {
+    checkAuth()
+  }, [])
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/users/me', {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const userData = await response.json()
+        // Vérifier que l'objet user a bien un id
+        if (userData && userData.id) {
+          setUser(userData)
+        } else {
+          setUser(null)
+        }
+      } else {
+        setUser(null)
+      }
+    } catch (error) {
+      console.error('Auth check error:', error)
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/users/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+      setUser(null)
+      setIsMenuOpen(false)
+      // Rediriger vers la homepage
+      window.location.href = '/'
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   return (
@@ -27,30 +75,59 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-6">
             <Link 
               href="/" 
-              className="text-gray-600 hover:text-gray-800 transition-colors"
+              className="text-gray-600 hover:text-gray-800 transition-colors font-medium"
             >
               Home
             </Link>
             
-            {status === 'loading' ? (
+            {loading ? (
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
                 <span className="text-gray-500">Loading...</span>
               </div>
-            ) : session ? (
+            ) : user ? (
               <>
+                {/* Liens pour utilisateurs connectés */}
                 <Link
                   href="/posts/create"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-1"
                 >
-                  Create Post
+                  <span>✍️</span>
+                  <span>Write</span>
                 </Link>
+                
+                {/* Lien admin pour les admins/auteurs */}
+                {(user.role === 'admin' || user.role === 'author') && (
+                  <Link
+                    href="/admin"
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center space-x-1"
+                  >
+                    <span>⚙️</span>
+                    <span>Admin</span>
+                  </Link>
+                )}
+                
                 <div className="flex items-center space-x-4">
-                  <span className="text-gray-600">
-                    Welcome, <span className="font-medium">{session.user?.name}</span>
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                      <span className="text-white font-medium text-sm">
+                        {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || '?'}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-600">
+                        <span className="font-medium">{user.name || user.email || 'User'}</span>
+                      </span>
+                      <div className="text-xs text-gray-500">
+                        {user.role === 'admin' && '👑 Admin'}
+                        {user.role === 'author' && '✍️ Author'}
+                        {user.role === 'user' && '👤 Member'}
+                        {!user.role && '👤 Member'}
+                      </div>
+                    </div>
+                  </div>
                   <button
-                    onClick={handleSignOut}
+                    onClick={handleLogout}
                     className="text-gray-600 hover:text-gray-800 transition-colors"
                   >
                     Sign Out
@@ -58,6 +135,7 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
+              /* Liens pour visiteurs */
               <div className="flex items-center space-x-3">
                 <Link
                   href="/auth/signin"
@@ -70,6 +148,12 @@ export default function Navbar() {
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   Sign Up
+                </Link>
+                <Link
+                  href="/admin"
+                  className="text-gray-500 hover:text-gray-700 transition-colors text-sm"
+                >
+                  Admin
                 </Link>
               </div>
             )}
@@ -104,23 +188,37 @@ export default function Navbar() {
                 Home
               </Link>
               
-              {session ? (
+              {user ? (
                 <>
                   <Link
                     href="/posts/create"
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-center"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Create Post
+                    ✍️ Write Post
                   </Link>
-                  <div className="text-gray-600">
-                    Welcome, <span className="font-medium">{session.user?.name}</span>
+                  
+                  {(user.role === 'admin' || user.role === 'author') && (
+                    <Link
+                      href="/admin"
+                      className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors font-medium text-center"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      ⚙️ Admin Panel
+                    </Link>
+                  )}
+                  
+                  <div className="text-gray-600 p-2 bg-gray-50 rounded">
+                    <div className="font-medium">{user.name || user.email || 'User'}</div>
+                    <div className="text-sm text-gray-500">
+                      {user.role === 'admin' && '👑 Admin'}
+                      {user.role === 'author' && '✍️ Author'} 
+                      {user.role === 'user' && '👤 Member'}
+                      {!user.role && '👤 Member'}
+                    </div>
                   </div>
                   <button
-                    onClick={() => {
-                      handleSignOut()
-                      setIsMenuOpen(false)
-                    }}
+                    onClick={handleLogout}
                     className="text-gray-600 hover:text-gray-800 transition-colors text-left"
                   >
                     Sign Out
@@ -141,6 +239,13 @@ export default function Navbar() {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Sign Up
+                  </Link>
+                  <Link
+                    href="/admin"
+                    className="text-gray-500 hover:text-gray-700 transition-colors text-center"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Admin Panel
                   </Link>
                 </>
               )}

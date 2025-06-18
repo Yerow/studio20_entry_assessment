@@ -1,3 +1,4 @@
+// payload.config.ts - PayloadCMS v3
 import { buildConfig } from 'payload'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
@@ -12,27 +13,33 @@ export default buildConfig({
     },
   },
   
-  // Collections (vos données)
+  // Collections
   collections: [
-    // Collection Users (authentification)
+    // Collection Users avec auth
     {
       slug: 'users',
-      auth: {
-        tokenExpiration: 7200, // 2 heures
-        verify: false,
-        maxLoginAttempts: 5,
-        lockTime: 600 * 1000, // 10 minutes
-      },
+      auth: true, // PayloadCMS v3 syntaxe simplifiée
       admin: {
         useAsTitle: 'name',
         defaultColumns: ['name', 'email', 'role', 'createdAt'],
         group: 'Admin',
       },
       access: {
-        create: () => true, // Permet la création du premier utilisateur
-        read: ({ req: { user } }) => !!user,
-        update: ({ req: { user } }) => !!user,
-        delete: ({ req: { user } }) => user?.role === 'admin',
+        create: () => true,
+        read: ({ req: { user } }) => {
+          if (!user) return false
+          if (user.role === 'admin') return true
+          return { id: { equals: user.id } }
+        },
+        update: ({ req: { user } }) => {
+          if (!user) return false
+          if (user.role === 'admin') return true
+          return { id: { equals: user.id } }
+        },
+        delete: ({ req: { user } }) => {
+          if (!user) return false
+          return user.role === 'admin'
+        },
       },
       fields: [
         {
@@ -54,11 +61,31 @@ export default buildConfig({
           admin: {
             position: 'sidebar',
           },
+          access: {
+            update: ({ req: { user } }) => {
+              if (!user) return false
+              return user.role === 'admin'
+            },
+          },
+        },
+        {
+          name: 'avatar',
+          type: 'text',
+          label: 'Avatar URL (optionnel)',
+          admin: {
+            position: 'sidebar',
+          },
+        },
+        {
+          name: 'bio',
+          type: 'textarea',
+          label: 'Biographie',
+          maxLength: 500,
         },
       ],
     },
 
-    // Collection Posts (articles de blog)
+    // Collection Posts
     {
       slug: 'posts',
       admin: {
@@ -70,10 +97,30 @@ export default buildConfig({
         },
       },
       access: {
-        read: () => true, // Tout le monde peut lire
-        create: ({ req: { user } }) => !!user, // Utilisateurs connectés peuvent créer
-        update: ({ req: { user } }) => !!user,
-        delete: ({ req: { user } }) => user?.role === 'admin', // Seuls les admins peuvent supprimer
+        read: ({ req: { user } }) => {
+          // Approche simplifiée pour éviter les erreurs de typage
+          if (!user) {
+            return { status: { equals: 'published' } }
+          }
+          
+          if (user.role === 'admin') {
+            return true
+          }
+          
+          // Pour les utilisateurs normaux, on retourne true et on filtre dans l'API
+          return true
+        },
+        create: ({ req: { user } }) => !!user,
+        update: ({ req: { user } }) => {
+          if (!user) return false
+          if (user.role === 'admin') return true
+          return { author: { equals: user.id } }
+        },
+        delete: ({ req: { user } }) => {
+          if (!user) return false
+          if (user.role === 'admin') return true
+          return { author: { equals: user.id } }
+        },
       },
       fields: [
         {
@@ -168,16 +215,24 @@ export default buildConfig({
             description: 'Article mis en avant',
           },
         },
+        {
+          name: 'tags',
+          type: 'text',
+          hasMany: true,
+          admin: {
+            position: 'sidebar',
+          },
+        },
       ],
       hooks: {
         beforeChange: [
           ({ req, operation, data }) => {
             if (operation === 'create') {
-              // Assigner l'auteur automatiquement
-              if (req.user) {
+              // Auto-assigner l'auteur
+              if (!data.author && req.user) {
                 data.author = req.user.id
               }
-              // Assigner la date de publication si l'article est publié
+              // Auto-assigner la date de publication
               if (data.status === 'published' && !data.publishedAt) {
                 data.publishedAt = new Date()
               }
@@ -189,7 +244,7 @@ export default buildConfig({
       versions: {
         drafts: {
           autosave: {
-            interval: 30000, // Sauvegarde automatique toutes les 30 secondes
+            interval: 30000,
           },
         },
       },
@@ -201,7 +256,7 @@ export default buildConfig({
     features: ({ defaultFeatures }) => defaultFeatures,
   }),
 
-  // Clé secrète (importante pour la sécurité)
+  // Clé secrète
   secret: process.env.PAYLOAD_SECRET || 'your-secret-here',
   
   // Génération des types TypeScript
@@ -214,14 +269,14 @@ export default buildConfig({
     url: process.env.MONGODB_URI!,
   }),
 
-  // CORS et CSRF pour la sécurité
+  // CORS et CSRF
   cors: [
-    process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    'http://localhost:3000',
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
   ].filter(Boolean),
 
   csrf: [
-    process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    'http://localhost:3000',
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
   ].filter(Boolean),
 })

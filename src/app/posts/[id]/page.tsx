@@ -1,115 +1,145 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { BlogPost } from '@/types'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 
-export default function PostDetail() {
-  const params = useParams()
-  const [post, setPost] = useState<BlogPost | null>(null)
-  const [loading, setLoading] = useState(true)
+interface PayloadUser {
+  id: string
+  email: string
+  name: string
+  role: 'admin' | 'author' | 'user'
+}
+
+export default function CreatePost() {
+  const [user, setUser] = useState<PayloadUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const router = useRouter()
+  
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    excerpt: ''
+  })
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Vérifier l'authentification
   useEffect(() => {
-    const getParams = async () => {
-      if (params.id) {
-        await fetchPost(params.id as string)
-      }
-    }
-    getParams()
-  }, [params.id])
+    checkAuth()
+  }, [])
 
-  const fetchPost = async (id: string) => {
+  const checkAuth = async () => {
     try {
-      const response = await fetch(`/api/posts/${id}`)
+      const response = await fetch('/api/users/me', { 
+        credentials: 'include' 
+      })
+      
       if (response.ok) {
-        const data = await response.json()
-        setPost(data)
-      } else if (response.status === 404) {
-        setError('Post not found')
+        const userData = await response.json()
+        setUser(userData)
       } else {
-        setError('Failed to load post')
+        // Pas connecté, rediriger vers signin
+        router.push('/auth/signin')
       }
     } catch (error) {
-      console.error('Error fetching post:', error)
-      setError('Something went wrong')
+      console.error('Auth check error:', error)
+      router.push('/auth/signin')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+    if (error) setError('')
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    // Validation côté client
+    if (!formData.title.trim() || !formData.content.trim()) {
+      setError('Title and content are required')
+      setLoading(false)
+      return
+    }
+
+    if (formData.title.trim().length < 3) {
+      setError('Title must be at least 3 characters long')
+      setLoading(false)
+      return
+    }
+
+    if (formData.content.trim().length < 10) {
+      setError('Content must be at least 10 characters long')
+      setLoading(false)
+      return
+    }
+
+    try {
+      // Créer le post via l'API PayloadCMS
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Important pour l'auth PayloadCMS
+        body: JSON.stringify({
+          title: formData.title.trim(),
+          content: formData.content.trim(),
+          excerpt: formData.excerpt.trim() || undefined,
+          status: 'published', // Publier directement (ou 'draft' selon tes besoins)
+          author: user?.id, // Assigner l'auteur
+          publishedAt: new Date().toISOString(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Succès ! Rediriger vers la homepage ou le post créé
+        if (data.doc && data.doc.id) {
+          router.push(`/posts/${data.doc.id}`)
+        } else {
+          router.push('/')
+        }
+      } else {
+        setError(data.errors?.[0]?.message || data.message || 'Failed to create post')
+      }
+    } catch (error) {
+      console.error('Create post error:', error)
+      setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const formatDate = (date: string | Date | undefined) => {
-    if (!date) return 'Unknown date'
-    const dateObj = typeof date === 'string' ? new Date(date) : date
-    return dateObj.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  // Supprimer la fonction formatContent car on utilise Markdown maintenant
-
-  if (loading) {
+  // Afficher loader pendant vérification auth
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Loading post...</p>
+        <div className="flex items-center justify-center pt-20">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-600">Checking authentication...</p>
           </div>
         </div>
       </div>
     )
   }
 
-  if (error || !post) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="mb-6">
-              <svg
-                className="mx-auto h-16 w-16 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {error === 'Post not found' ? 'Post not found' : 'Something went wrong'}
-            </h2>
-            <p className="text-gray-600 mb-6">
-              {error === 'Post not found' 
-                ? 'The post you\'re looking for doesn\'t exist or has been removed.'
-                : 'We couldn\'t load this post. Please try again later.'
-              }
-            </p>
-            <Link
-              href="/"
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              ← Back to Home
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
+  // Ne pas afficher si pas authentifié (redirection en cours)
+  if (!user) {
+    return null
   }
 
   return (
@@ -117,87 +147,152 @@ export default function PostDetail() {
       <Navbar />
       
       <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Back button */}
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center text-blue-600 hover:text-blue-700 transition-colors"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to all posts
-          </Link>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Create New Post
+          </h1>
+          <p className="text-gray-600">
+            Share your thoughts with the Blog 20 community, {user.name}!
+          </p>
         </div>
 
-        {/* Post content */}
-        <article className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {/* Header */}
-          <div className="px-6 py-8 border-b border-gray-200">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight">
-              {post.title}
-            </h1>
-            
-            {/* Author and date info */}
-            <div className="flex items-center space-x-4 text-gray-600">
-              <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-medium">
-                    {post.author.name.charAt(0).toUpperCase()}
-                  </span>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <div className="flex">
+                  <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  {error}
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900">{post.author.name}</p>
-                  <p className="text-sm text-gray-500">{post.author.email}</p>
-                </div>
-              </div>
-              <div className="text-sm text-gray-500">
-                <time dateTime={post.createdAt ? new Date(post.createdAt).toISOString() : undefined}>
-                  Published {formatDate(post.createdAt)}
-                </time>
-              </div>
-            </div>
-
-            {/* Excerpt */}
-            {post.excerpt && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                <p className="text-gray-700 italic text-lg leading-relaxed">
-                  {post.excerpt}
-                </p>
               </div>
             )}
-          </div>
 
-          {/* Content avec GitHub Markdown styles */}
-          <div className="px-6 py-8">
-            <div className="markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {post.content}
-              </ReactMarkdown>
+            {/* Title Field */}
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                Title *
+              </label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+                placeholder="Enter your post title..."
+                value={formData.title}
+                onChange={handleInputChange}
+                maxLength={100}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                {formData.title.length}/100 characters
+              </p>
             </div>
-          </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-500">
-                {post.createdAt !== post.updatedAt && (
-                  <span>
-                    Last updated {formatDate(post.updatedAt)}
-                  </span>
-                )}
-              </div>
-              <div className="flex space-x-2">
-                <Link
-                  href="/"
-                  className="text-blue-600 hover:text-blue-700 text-sm transition-colors"
+            {/* Excerpt Field */}
+            <div>
+              <label htmlFor="excerpt" className="block text-sm font-medium text-gray-700 mb-2">
+                Excerpt (Optional)
+              </label>
+              <input
+                type="text"
+                id="excerpt"
+                name="excerpt"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Brief description of your post..."
+                value={formData.excerpt}
+                onChange={handleInputChange}
+                maxLength={200}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                {formData.excerpt.length}/200 characters • If left empty, we will auto-generate from your content
+              </p>
+            </div>
+
+            {/* Content Field */}
+            <div>
+              <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+                Content *
+              </label>
+              <textarea
+                id="content"
+                name="content"
+                required
+                rows={12}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+                placeholder="Write your blog post content here...
+
+You can use simple formatting:
+
+**Bold text**
+*Italic text*
+
+- Bullet points
+- Another point
+
+Or just write in plain text!"
+                value={formData.content}
+                onChange={handleInputChange}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                {formData.content.length} characters • Minimum 10 characters required
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <Link
+                href="/"
+                className="text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                ← Cancel
+              </Link>
+              
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ title: '', content: '', excerpt: '' })
+                    setError('')
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
                 >
-                  Read more posts
-                </Link>
+                  Clear
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !formData.title.trim() || !formData.content.trim()}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Publishing...
+                    </>
+                  ) : (
+                    'Publish Post'
+                  )}
+                </button>
               </div>
             </div>
+          </form>
+        </div>
+
+        {/* Info Section */}
+        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-blue-800 mb-2">
+            ✨ Publishing with PayloadCMS
+          </h3>
+          <div className="text-sm text-blue-700 space-y-1">
+            <p>• Your post will be published immediately and visible to all visitors</p>
+            <p>• You can edit or delete your posts anytime</p>
+            <p>• Admins can access advanced editing features in the <Link href="/admin" className="underline">admin panel</Link></p>
           </div>
-        </article>
+        </div>
       </div>
     </div>
   )

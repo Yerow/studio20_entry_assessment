@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -20,7 +19,6 @@ export default function SignIn() {
       ...prev,
       [name]: value
     }))
-    // Clear error when user starts typing
     if (error) setError('')
   }
 
@@ -36,18 +34,27 @@ export default function SignIn() {
     }
 
     try {
-      const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
-        redirect: false,
+      // Connexion via PayloadCMS
+      const response = await fetch('/api/users/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: formData.email.toLowerCase().trim(),
+          password: formData.password
+        }),
       })
 
-      if (result?.error) {
-        setError('Invalid email or password')
-      } else {
-        // Sign in successful
+      const data = await response.json()
+
+      if (response.ok && data.user) {
+        // Connexion réussie
         router.push('/')
         router.refresh()
+      } else {
+        setError(data.errors?.[0]?.message || data.message || 'Invalid email or password')
       }
     } catch (error) {
       console.error('Sign in error:', error)
@@ -157,6 +164,22 @@ export default function SignIn() {
             </Link>
           </div>
         </form>
+
+        {/* Info pour les admins */}
+        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h3 className="text-sm font-medium text-blue-800 mb-2">
+            👑 Admin & Content Managers
+          </h3>
+          <p className="text-sm text-blue-700 mb-2">
+            Looking for the advanced admin interface?
+          </p>
+          <Link
+            href="/admin"
+            className="text-sm font-medium text-blue-600 hover:text-blue-500 underline"
+          >
+            Access PayloadCMS Admin Panel →
+          </Link>
+        </div>
       </div>
     </div>
   )

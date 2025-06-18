@@ -21,7 +21,6 @@ export default function SignUp() {
       ...prev,
       [name]: value
     }))
-    // Clear error when user starts typing
     if (error) setError('')
   }
 
@@ -30,7 +29,7 @@ export default function SignUp() {
     setLoading(true)
     setError('')
 
-    // Client-side validation
+    // Validation côté client
     if (!formData.name || !formData.email || !formData.password) {
       setError('Please fill in all fields')
       setLoading(false)
@@ -44,24 +43,50 @@ export default function SignUp() {
     }
 
     try {
-      const response = await fetch('/api/auth/register', {
+      // Créer l'utilisateur via PayloadCMS
+      const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        credentials: 'include',
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.toLowerCase().trim(),
+          password: formData.password
+        }),
       })
 
       const data = await response.json()
 
       if (response.ok) {
         setSuccess(true)
-        // Redirect to sign in page after 2 seconds
-        setTimeout(() => {
-          router.push('/auth/signin')
+        // Auto-connexion après inscription
+        setTimeout(async () => {
+          try {
+            const loginResponse = await fetch('/api/users/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                email: formData.email,
+                password: formData.password
+              }),
+            })
+
+            if (loginResponse.ok) {
+              router.push('/')
+            } else {
+              router.push('/auth/signin')
+            }
+          } catch (error) {
+            router.push('/auth/signin')
+          }
         }, 2000)
       } else {
-        setError(data.error || 'Registration failed')
+        setError(data.errors?.[0]?.message || data.message || 'Registration failed')
       }
     } catch (error) {
       console.error('Registration error:', error)
@@ -82,10 +107,10 @@ export default function SignUp() {
               </svg>
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900">
-              Account created successfully!
+              Welcome to Blog 20!
             </h2>
             <p className="mt-2 text-sm text-gray-600">
-              Redirecting you to sign in...
+              Your account has been created successfully. Signing you in...
             </p>
           </div>
         </div>
