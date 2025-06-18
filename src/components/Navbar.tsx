@@ -58,7 +58,7 @@ export default function Navbar() {
 
     try {
       // 1. Utiliser notre API custom de logout (plus fiable sur Vercel)
-      const response = await fetch('/api/auth/logout', {
+      await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
         headers: {
