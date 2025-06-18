@@ -1,4 +1,4 @@
-// src/app/auth/signup/page.tsx - English Sign Up with Role Selection
+// src/app/auth/signup/page.tsx - Fixed TypeScript error
 
 'use client'
 
@@ -19,6 +19,12 @@ interface FormErrors {
   password?: string
   role?: string
   general?: string
+}
+
+// Type pour les erreurs d'API
+interface ApiError {
+  message?: string
+  errors?: Array<{ message: string }>
 }
 
 export default function SignUpPage() {
@@ -87,7 +93,7 @@ export default function SignUpPage() {
         body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
+      const data: ApiError = await response.json()
 
       if (!response.ok) {
         throw new Error(data.message || 'Registration failed')
@@ -113,10 +119,11 @@ export default function SignUpPage() {
         // If auto-login fails, redirect to sign in
         router.push('/auth/signin?message=Registration successful, please sign in')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Registration error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred during registration'
       setErrors({
-        general: error.message || 'An error occurred during registration'
+        general: errorMessage
       })
     } finally {
       setLoading(false)
