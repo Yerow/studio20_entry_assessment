@@ -154,7 +154,7 @@ export default function Navbar() {
                   <span>Write</span>
                 </Link>
                 
-                {(user.role === 'admin' || user.role === 'author') && (
+                {(user.role === 'admin') && (
                   <Link
                     href="/admin"
                     className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center space-x-1"
@@ -215,12 +215,6 @@ export default function Navbar() {
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   Sign Up
-                </Link>
-                <Link
-                  href="/admin"
-                  className="text-gray-500 hover:text-gray-700 transition-colors text-sm"
-                >
-                  Admin
                 </Link>
               </div>
             )}
