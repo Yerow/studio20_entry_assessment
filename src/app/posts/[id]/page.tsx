@@ -24,9 +24,17 @@ interface PayloadPost {
   slug?: string
 }
 
+interface PayloadUser {
+  id: string
+  email: string
+  name?: string
+  role?: 'admin' | 'author' | 'user'
+}
+
 export default function PostDetail() {
   const params = useParams()
   const [post, setPost] = useState<PayloadPost | null>(null)
+  const [user, setUser] = useState<PayloadUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -37,7 +45,28 @@ export default function PostDetail() {
       }
     }
     getParams()
+    checkAuth()
   }, [params.id])
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/users/me', { credentials: 'include' })
+      if (response.ok) {
+        const userData = await response.json()
+        const actualUser = userData.user || userData
+        
+        if (actualUser && actualUser.id) {
+          setUser(actualUser)
+        } else {
+          setUser(null)
+        }
+      } else {
+        setUser(null)
+      }
+    } catch {
+      setUser(null)
+    }
+  }
 
   const fetchPost = async (id: string) => {
     try {
@@ -75,6 +104,9 @@ export default function PostDetail() {
       minute: '2-digit'
     })
   }
+
+  // Vérifier si l'utilisateur est admin ou auteur
+  const isAdminOrAuthor = user && (user.role === 'admin' || user.role === 'author')
 
   // Fonction pour extraire et afficher le Markdown depuis Lexical
   const renderContent = (content: Record<string, unknown>) => {
@@ -124,17 +156,19 @@ export default function PostDetail() {
         <p className="text-gray-700 leading-relaxed">
           {post?.excerpt || 'No content available.'}
         </p>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-blue-800 text-sm">
-            📝 This post was created with PayloadCMS. 
-            <Link 
-              href={`/admin/collections/posts/${post?.id}`}
-              className="font-medium underline hover:no-underline ml-1"
-            >
-              Edit in admin panel →
-            </Link>
-          </p>
-        </div>
+        {isAdminOrAuthor && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-blue-800 text-sm">
+              📝 This post was created with PayloadCMS. 
+              <Link 
+                href={`/admin/collections/posts/${post?.id}`}
+                className="font-medium underline hover:no-underline ml-1"
+              >
+                Edit in admin panel →
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
     )
   }
@@ -284,12 +318,21 @@ export default function PostDetail() {
                 >
                   ← More posts
                 </Link>
-                <Link
-                  href="/admin"
-                  className="text-gray-600 hover:text-gray-800 text-sm transition-colors"
-                >
-                  ✍️ Write post
-                </Link>
+                {isAdminOrAuthor ? (
+                  <Link
+                    href="/admin"
+                    className="text-gray-600 hover:text-gray-800 text-sm transition-colors"
+                  >
+                    ⚙️ Manage posts
+                  </Link>
+                ) : (
+                  <Link
+                    href="/posts/create"
+                    className="text-gray-600 hover:text-gray-800 text-sm transition-colors"
+                  >
+                    ✍️ Write your own
+                  </Link>
+                )}
               </div>
             </div>
           </div>

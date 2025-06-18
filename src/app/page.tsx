@@ -34,6 +34,7 @@ interface PayloadUser {
   id: string
   email: string
   name?: string
+  role?: 'admin' | 'author' | 'user'
 }
 
 export default function Home() {
@@ -102,6 +103,9 @@ export default function Home() {
     return 'Click to read more...'
   }
 
+  // Vérifier si l'utilisateur est admin ou auteur
+  const isAdminOrAuthor = user && (user.role === 'admin' || user.role === 'author')
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -148,9 +152,11 @@ export default function Home() {
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg max-w-md mx-auto">
               {error}
               <br />
-              <small className="text-red-600">
-                Make sure PayloadCMS is running on <Link href="/admin" className="underline">/admin</Link>
-              </small>
+              {isAdminOrAuthor && (
+                <small className="text-red-600">
+                  Make sure PayloadCMS is running on <Link href="/admin" className="underline">/admin</Link>
+                </small>
+              )}
             </div>
           </div>
         )}
@@ -255,24 +261,26 @@ export default function Home() {
               </div>
             )}
 
-            {/* Admin Link */}
-            <div className="mt-12 text-center">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-blue-800 mb-2">
-                  ✍️ Writers & Admins
-                </h3>
-                <p className="text-blue-700 mb-4">
-                  Create, edit, and manage your blog posts with the powerful PayloadCMS admin interface.
-                </p>
-                <Link
-                  href="/admin"
-                  className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium space-x-2"
-                >
-                  <span>🚀</span>
-                  <span>Go to Admin Panel</span>
-                </Link>
+            {/* Admin Link - Visible uniquement pour les admins/auteurs */}
+            {isAdminOrAuthor && (
+              <div className="mt-12 text-center">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-blue-800 mb-2">
+                    ✍️ Content Management
+                  </h3>
+                  <p className="text-blue-700 mb-4">
+                    Access the powerful admin interface to create, edit, and manage your blog posts.
+                  </p>
+                  <Link
+                    href="/admin"
+                    className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium space-x-2"
+                  >
+                    <span>🚀</span>
+                    <span>Go to Admin Panel</span>
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>

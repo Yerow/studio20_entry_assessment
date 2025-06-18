@@ -56,8 +56,7 @@ export default function SignIn() {
       } else {
         setError(data.errors?.[0]?.message || data.message || 'Invalid email or password')
       }
-    } catch (error) {
-      console.error('Sign in error:', error)
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -164,22 +163,6 @@ export default function SignIn() {
             </Link>
           </div>
         </form>
-
-        {/* Info pour les admins */}
-        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">
-            👑 Admin & Content Managers
-          </h3>
-          <p className="text-sm text-blue-700 mb-2">
-            Looking for the advanced admin interface?
-          </p>
-          <Link
-            href="/admin"
-            className="text-sm font-medium text-blue-600 hover:text-blue-500 underline"
-          >
-            Access PayloadCMS Admin Panel →
-          </Link>
-        </div>
       </div>
     </div>
   )

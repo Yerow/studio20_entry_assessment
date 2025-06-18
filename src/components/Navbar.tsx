@@ -1,4 +1,3 @@
-// src/components/Navbar.tsx - Version Vercel Fix
 'use client'
 
 import Link from 'next/link'
