@@ -1,7 +1,9 @@
+// src/components/Navbar.tsx - Version Vercel Fix
 'use client'
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface PayloadUser {
   id: string
@@ -14,8 +16,9 @@ export default function Navbar() {
   const [user, setUser] = useState<PayloadUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const router = useRouter()
 
-  // Vérifier l'auth au chargement
   useEffect(() => {
     checkAuth()
   }, [])
@@ -23,12 +26,12 @@ export default function Navbar() {
   const checkAuth = async () => {
     try {
       const response = await fetch('/api/users/me', {
-        credentials: 'include'
+        credentials: 'include',
+        cache: 'no-store'
       })
       
       if (response.ok) {
         const userData = await response.json()
-        // PayloadCMS retourne { user: {...}, token: '...' }
         const actualUser = userData.user || userData
         
         if (actualUser && actualUser.id) {
@@ -39,7 +42,8 @@ export default function Navbar() {
       } else {
         setUser(null)
       }
-    } catch {
+    } catch (error) {
+      console.error('Auth check error:', error)
       setUser(null)
     } finally {
       setLoading(false)
@@ -47,16 +51,72 @@ export default function Navbar() {
   }
 
   const handleLogout = async () => {
+    if (isLoggingOut) return
+    
+    setIsLoggingOut(true)
+    setIsMenuOpen(false)
+
     try {
-      await fetch('/api/users/logout', {
+      // 1. Utiliser notre API custom de logout (plus fiable sur Vercel)
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store'
       })
+
+      // 2. Nettoyer l'état côté client immédiatement
       setUser(null)
-      setIsMenuOpen(false)
-      window.location.href = '/'
-    } catch {
-      console.error('Logout error')
+      
+      // 3. Nettoyer TOUS les cookies PayloadCMS
+      const cookiesToClear = [
+        'payload-token',
+        'payload_token', 
+        'payload-refresh-token',
+        'payload_refresh_token',
+        'connect.sid',
+        'session',
+        'auth',
+        '__Secure-payload-token',
+        '__Host-payload-token'
+      ]
+
+      cookiesToClear.forEach(cookieName => {
+        // Supprimer pour le domaine actuel
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`
+        
+        // Supprimer pour le domaine parent (Vercel)
+        if (window.location.hostname.includes('vercel.app')) {
+          const domain = window.location.hostname.split('.').slice(-2).join('.')
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${domain};`
+        }
+      })
+
+      // 4. Forcer le refresh de Next.js
+      router.refresh()
+      
+      // 5. Redirection avec delay pour laisser le temps au nettoyage
+      setTimeout(() => {
+        window.location.href = window.location.origin
+      }, 500)
+
+      console.log('Logout successful')
+
+    } catch (error) {
+      console.error('Logout error:', error)
+      
+      // Même en cas d'erreur, nettoyer côté client
+      setUser(null)
+      
+      // Forcer la redirection
+      setTimeout(() => {
+        window.location.href = window.location.origin
+      }, 100)
+    } finally {
+      setIsLoggingOut(false)
     }
   }
 
@@ -87,7 +147,6 @@ export default function Navbar() {
               </div>
             ) : user ? (
               <>
-                {/* Liens pour utilisateurs connectés */}
                 <Link
                   href="/posts/create"
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-1"
@@ -96,7 +155,6 @@ export default function Navbar() {
                   <span>Write</span>
                 </Link>
                 
-                {/* Lien admin SEULEMENT pour les admins/auteurs */}
                 {(user.role === 'admin' || user.role === 'author') && (
                   <Link
                     href="/admin"
@@ -128,14 +186,24 @@ export default function Navbar() {
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-gray-600 hover:text-gray-800 transition-colors"
+                    disabled={isLoggingOut}
+                    className="text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
                   >
-                    Sign Out
+                    {isLoggingOut ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Signing out...</span>
+                      </>
+                    ) : (
+                      <span>Sign Out</span>
+                    )}
                   </button>
                 </div>
               </>
             ) : (
-              /* Liens pour visiteurs NON CONNECTÉS */
               <div className="flex items-center space-x-3">
                 <Link
                   href="/auth/signin"
@@ -149,7 +217,6 @@ export default function Navbar() {
                 >
                   Sign Up
                 </Link>
-                {/* Admin visible pour tous */}
                 <Link
                   href="/admin"
                   className="text-gray-500 hover:text-gray-700 transition-colors text-sm"
@@ -220,9 +287,10 @@ export default function Navbar() {
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-gray-600 hover:text-gray-800 transition-colors text-left"
+                    disabled={isLoggingOut}
+                    className="text-gray-600 hover:text-gray-800 transition-colors text-left disabled:opacity-50"
                   >
-                    Sign Out
+                    {isLoggingOut ? 'Signing out...' : 'Sign Out'}
                   </button>
                 </>
               ) : (
