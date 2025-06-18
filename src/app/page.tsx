@@ -46,9 +46,11 @@ export default function Home() {
       const response = await fetch('/api/users/me', { credentials: 'include' })
       if (response.ok) {
         const userData = await response.json()
-        // Vérifier que l'objet user a bien un id
-        if (userData && userData.id) {
-          setUser(userData)
+        // PayloadCMS retourne { user: {...}, token: '...' }
+        const actualUser = userData.user || userData
+        
+        if (actualUser && actualUser.id) {
+          setUser(actualUser)
         } else {
           setUser(null)
         }
@@ -184,11 +186,11 @@ export default function Home() {
                           <div className="flex items-center space-x-2">
                             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
                               <span className="text-white font-medium text-sm">
-                                {post.author.name.charAt(0).toUpperCase()}
+                                {post.author?.name?.charAt(0)?.toUpperCase() || post.author?.email?.charAt(0)?.toUpperCase() || '?'}
                               </span>
                             </div>
                             <span className="font-medium text-gray-700">
-                              {post.author.name}
+                              {post.author?.name || post.author?.email || 'Unknown Author'}
                             </span>
                           </div>
                           <time dateTime={post.publishedAt || post.createdAt}>

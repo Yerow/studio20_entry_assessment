@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface PayloadUser {
   id: string
@@ -24,6 +26,7 @@ export default function CreatePost() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
 
   // Vérifier l'authentification
   useEffect(() => {
@@ -38,9 +41,15 @@ export default function CreatePost() {
       
       if (response.ok) {
         const userData = await response.json()
-        setUser(userData)
+        // PayloadCMS retourne { user: {...}, token: '...' }
+        const actualUser = userData.user || userData
+        
+        if (actualUser && actualUser.id) {
+          setUser(actualUser)
+        } else {
+          router.push('/auth/signin')
+        }
       } else {
-        // Pas connecté, rediriger vers signin
         router.push('/auth/signin')
       }
     } catch (error) {
@@ -58,6 +67,28 @@ export default function CreatePost() {
       [name]: value
     }))
     if (error) setError('')
+  }
+
+  // Fonction pour convertir Markdown en structure Lexical simple
+  const markdownToLexical = (markdown: string) => {
+    // Structure Lexical basique qui contient le markdown
+    return {
+      root: {
+        type: 'root',
+        children: [
+          {
+            type: 'paragraph',
+            children: [
+              {
+                type: 'text',
+                text: markdown, // On stocke le markdown tel quel
+                format: 0
+              }
+            ]
+          }
+        ]
+      }
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,19 +116,21 @@ export default function CreatePost() {
     }
 
     try {
-      // Créer le post via l'API PayloadCMS
+      // Convertir le markdown en format Lexical pour PayloadCMS
+      const lexicalContent = markdownToLexical(formData.content.trim())
+
       const response = await fetch('/api/posts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Important pour l'auth PayloadCMS
+        credentials: 'include',
         body: JSON.stringify({
           title: formData.title.trim(),
-          content: formData.content.trim(),
+          content: lexicalContent,
           excerpt: formData.excerpt.trim() || undefined,
-          status: 'published', // Publier directement (ou 'draft' selon tes besoins)
-          author: user?.id, // Assigner l'auteur
+          status: 'published',
+          author: user?.id,
           publishedAt: new Date().toISOString(),
         }),
       })
@@ -105,7 +138,7 @@ export default function CreatePost() {
       const data = await response.json()
 
       if (response.ok) {
-        // Succès ! Rediriger vers la homepage ou le post créé
+        // Succès ! Rediriger vers le post créé
         if (data.doc && data.doc.id) {
           router.push(`/posts/${data.doc.id}`)
         } else {
@@ -152,7 +185,7 @@ export default function CreatePost() {
             Create New Post
           </h1>
           <p className="text-gray-600">
-            Share your thoughts with the Blog 20 community, {user.name}!
+            Share your thoughts with the Blog 20 community, {user.name || user.email}!
           </p>
         </div>
 
@@ -210,33 +243,92 @@ export default function CreatePost() {
               </p>
             </div>
 
-            {/* Content Field */}
+            {/* Content Field with Markdown Preview */}
             <div>
-              <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-                Content *
-              </label>
-              <textarea
-                id="content"
-                name="content"
-                required
-                rows={12}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
-                placeholder="Write your blog post content here...
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="content" className="block text-sm font-medium text-gray-700">
+                  Content * (Markdown supported)
+                </label>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview(false)}
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                      !showPreview 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                    }`}
+                  >
+                    ✍️ Write
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview(true)}
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                      showPreview 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                    }`}
+                  >
+                    👁️ Preview
+                  </button>
+                </div>
+              </div>
+              
+              {!showPreview ? (
+                <textarea
+                  id="content"
+                  name="content"
+                  required
+                  rows={15}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical font-mono text-sm"
+                  placeholder="Write your blog post in Markdown...
 
-You can use simple formatting:
+# This is a heading
+## This is a subheading
 
-**Bold text**
-*Italic text*
+**Bold text** and *italic text*
 
-- Bullet points
-- Another point
+- Bullet point
+- Another bullet point
 
-Or just write in plain text!"
-                value={formData.content}
-                onChange={handleInputChange}
-              />
+```javascript
+// Code blocks are supported too!
+console.log('Hello world');
+```
+
+[Link to somewhere](https://example.com)
+
+> This is a quote
+
+Normal paragraph text here..."
+                  value={formData.content}
+                  onChange={handleInputChange}
+                />
+              ) : (
+                <div className="w-full min-h-[400px] px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 overflow-auto">
+                  {formData.content ? (
+                    <div className="markdown-body">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {formData.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">Preview will appear here when you start writing...</p>
+                  )}
+                </div>
+              )}
+              
               <p className="mt-1 text-sm text-gray-500">
-                {formData.content.length} characters • Minimum 10 characters required
+                {formData.content.length} characters • Minimum 10 characters required • 
+                <a 
+                  href="https://www.markdownguide.org/basic-syntax/" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-blue-600 hover:text-blue-700 ml-1"
+                >
+                  Markdown guide
+                </a>
               </p>
             </div>
 
@@ -282,15 +374,30 @@ Or just write in plain text!"
           </form>
         </div>
 
-        {/* Info Section */}
+        {/* Markdown Guide */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="text-sm font-medium text-blue-800 mb-2">
-            ✨ Publishing with PayloadCMS
+            📝 Markdown Quick Reference
           </h3>
-          <div className="text-sm text-blue-700 space-y-1">
-            <p>• Your post will be published immediately and visible to all visitors</p>
-            <p>• You can edit or delete your posts anytime</p>
-            <p>• Admins can access advanced editing features in the <Link href="/admin" className="underline">admin panel</Link></p>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-sm font-medium text-blue-800 mb-1">Formatting:</h4>
+              <ul className="text-sm text-blue-700 space-y-1 font-mono">
+                <li>**bold** and *italic*</li>
+                <li># Heading 1</li>
+                <li>## Heading 2</li>
+                <li>`inline code`</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-blue-800 mb-1">Lists & Links:</h4>
+              <ul className="text-sm text-blue-700 space-y-1 font-mono">
+                <li>- Bullet list</li>
+                <li>1. Numbered list</li>
+                <li>[Link text](URL)</li>
+                <li> Quote block</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

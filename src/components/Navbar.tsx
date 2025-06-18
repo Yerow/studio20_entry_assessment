@@ -6,8 +6,8 @@ import { useState, useEffect } from 'react'
 interface PayloadUser {
   id: string
   email: string
-  name?: string // Optionnel car peut être manquant
-  role?: 'admin' | 'author' | 'user' // Optionnel aussi
+  name?: string
+  role?: 'admin' | 'author' | 'user'
 }
 
 export default function Navbar() {
@@ -28,9 +28,11 @@ export default function Navbar() {
       
       if (response.ok) {
         const userData = await response.json()
-        // Vérifier que l'objet user a bien un id
-        if (userData && userData.id) {
-          setUser(userData)
+        // PayloadCMS retourne { user: {...}, token: '...' }
+        const actualUser = userData.user || userData
+        
+        if (actualUser && actualUser.id) {
+          setUser(actualUser)
         } else {
           setUser(null)
         }
@@ -38,7 +40,6 @@ export default function Navbar() {
         setUser(null)
       }
     } catch (error) {
-      console.error('Auth check error:', error)
       setUser(null)
     } finally {
       setLoading(false)
@@ -53,7 +54,6 @@ export default function Navbar() {
       })
       setUser(null)
       setIsMenuOpen(false)
-      // Rediriger vers la homepage
       window.location.href = '/'
     } catch (error) {
       console.error('Logout error:', error)
@@ -96,7 +96,7 @@ export default function Navbar() {
                   <span>Write</span>
                 </Link>
                 
-                {/* Lien admin pour les admins/auteurs */}
+                {/* Lien admin SEULEMENT pour les admins/auteurs */}
                 {(user.role === 'admin' || user.role === 'author') && (
                   <Link
                     href="/admin"
@@ -135,7 +135,7 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
-              /* Liens pour visiteurs */
+              /* Liens pour visiteurs NON CONNECTÉS */
               <div className="flex items-center space-x-3">
                 <Link
                   href="/auth/signin"
@@ -149,6 +149,7 @@ export default function Navbar() {
                 >
                   Sign Up
                 </Link>
+                {/* Admin visible pour tous */}
                 <Link
                   href="/admin"
                   className="text-gray-500 hover:text-gray-700 transition-colors text-sm"
