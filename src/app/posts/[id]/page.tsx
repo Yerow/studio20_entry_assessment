@@ -10,7 +10,7 @@ import remarkGfm from 'remark-gfm'
 interface PayloadPost {
   id: string
   title: string
-  content: any
+  content: Record<string, unknown>
   excerpt?: string
   author: {
     id: string
@@ -57,8 +57,7 @@ export default function PostDetail() {
       } else {
         setError('Failed to load post')
       }
-    } catch (error) {
-      console.error('Error fetching post:', error)
+    } catch {
       setError('Something went wrong')
     } finally {
       setLoading(false)
@@ -78,27 +77,34 @@ export default function PostDetail() {
   }
 
   // Fonction pour extraire et afficher le Markdown depuis Lexical
-  const renderContent = (content: any) => {
+  const renderContent = (content: Record<string, unknown>) => {
     let markdownText = ''
     
     if (typeof content === 'string') {
       // Si c'est du texte simple, on l'utilise tel quel
       markdownText = content
-    } else if (content && content.root && content.root.children) {
-      // Extraire le markdown du format Lexical
-      const extractMarkdown = (nodes: any[]): string => {
-        return nodes.map(node => {
-          if (node.type === 'text') {
-            return node.text || ''
-          }
-          if (node.children) {
-            return extractMarkdown(node.children)
-          }
-          return ''
-        }).join('')
-      }
+    } else if (content && content.root && typeof content.root === 'object') {
+      const root = content.root as { children?: unknown[] }
       
-      markdownText = extractMarkdown(content.root.children)
+      if (root.children) {
+        // Extraire le markdown du format Lexical
+        const extractMarkdown = (nodes: unknown[]): string => {
+          return nodes.map(node => {
+            if (node && typeof node === 'object') {
+              const nodeObj = node as { type?: string; text?: string; children?: unknown[] }
+              if (nodeObj.type === 'text' && nodeObj.text) {
+                return nodeObj.text
+              }
+              if (nodeObj.children) {
+                return extractMarkdown(nodeObj.children)
+              }
+            }
+            return ''
+          }).join('')
+        }
+        
+        markdownText = extractMarkdown(root.children)
+      }
     }
     
     // Si on a du contenu, l'afficher en Markdown

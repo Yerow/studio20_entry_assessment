@@ -81,15 +81,14 @@ export default function SignUp() {
             } else {
               router.push('/auth/signin')
             }
-          } catch (error) {
+          } catch {
             router.push('/auth/signin')
           }
         }, 2000)
       } else {
         setError(data.errors?.[0]?.message || data.message || 'Registration failed')
       }
-    } catch (error) {
-      console.error('Registration error:', error)
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)

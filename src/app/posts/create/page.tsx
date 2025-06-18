@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -29,11 +29,7 @@ export default function CreatePost() {
   const [showPreview, setShowPreview] = useState(false)
 
   // Vérifier l'authentification
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/users/me', { 
         credentials: 'include' 
@@ -52,13 +48,16 @@ export default function CreatePost() {
       } else {
         router.push('/auth/signin')
       }
-    } catch (error) {
-      console.error('Auth check error:', error)
+    } catch {
       router.push('/auth/signin')
     } finally {
       setAuthLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -147,8 +146,7 @@ export default function CreatePost() {
       } else {
         setError(data.errors?.[0]?.message || data.message || 'Failed to create post')
       }
-    } catch (error) {
-      console.error('Create post error:', error)
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setLoading(false)

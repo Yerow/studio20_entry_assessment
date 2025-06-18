@@ -8,7 +8,7 @@ import Navbar from '@/components/Navbar'
 interface PayloadPost {
   id: string
   title: string
-  content: any
+  content: Record<string, unknown>
   excerpt?: string
   author: {
     id: string
@@ -30,11 +30,17 @@ interface PayloadResponse {
   totalPages: number
 }
 
+interface PayloadUser {
+  id: string
+  email: string
+  name?: string
+}
+
 export default function Home() {
   const [posts, setPosts] = useState<PayloadPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState<PayloadUser | null>(null)
 
   useEffect(() => {
     fetchPosts()
@@ -57,8 +63,7 @@ export default function Home() {
       } else {
         setUser(null)
       }
-    } catch (error) {
-      console.error('Auth check error:', error)
+    } catch {
       setUser(null)
     }
   }
@@ -75,8 +80,7 @@ export default function Home() {
         console.error('Erreur API:', response.status, response.statusText)
         setError('Failed to fetch posts')
       }
-    } catch (error) {
-      console.error('Error fetching posts:', error)
+    } catch {
       setError('Something went wrong')
     } finally {
       setLoading(false)

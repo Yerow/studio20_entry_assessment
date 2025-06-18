@@ -27,7 +27,7 @@ export const authAPI = {
           error: data.message || 'Erreur de connexion' 
         }
       }
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Erreur réseau' }
     }
   },
@@ -40,7 +40,7 @@ export const authAPI = {
         credentials: 'include',
       })
       return { success: true }
-    } catch (error) {
+    } catch {
       return { success: false }
     }
   },
@@ -66,7 +66,7 @@ export const authAPI = {
           error: result.message || 'Erreur création compte' 
         }
       }
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Erreur réseau' }
     }
   },
@@ -83,7 +83,7 @@ export const authAPI = {
         return data.id ? data : null
       }
       return null
-    } catch (error) {
+    } catch {
       return null
     }
   }

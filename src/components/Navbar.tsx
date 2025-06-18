@@ -39,7 +39,7 @@ export default function Navbar() {
       } else {
         setUser(null)
       }
-    } catch (error) {
+    } catch {
       setUser(null)
     } finally {
       setLoading(false)
@@ -55,8 +55,8 @@ export default function Navbar() {
       setUser(null)
       setIsMenuOpen(false)
       window.location.href = '/'
-    } catch (error) {
-      console.error('Logout error:', error)
+    } catch {
+      console.error('Logout error')
     }
   }
 
