@@ -81,19 +81,15 @@ Create `.env.local` in the root directory:
 
 ```env
 # Database Configuration
-MONGODB_URI=mongodb://localhost:27017/blog20
-# For MongoDB Atlas:
-# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/blog20
+# MONGODB_URI=`mongodb string`
 
 # PayloadCMS Configuration
-PAYLOAD_SECRET=your-super-secret-key-minimum-32-characters
+PAYLOAD_SECRET=X
 PAYLOAD_CONFIG_PATH=./payload.config.ts
 
 # Development
 NODE_ENV=development
 ```
-
-⚠️ **Important**: `PAYLOAD_SECRET` must be at least 32 characters long.
 
 ### 3. Generate Types & Start Development
 
