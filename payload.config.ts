@@ -45,7 +45,6 @@ export default buildConfig({
     user: 'users',
     meta: {
       titleSuffix: '- Blog 20 Admin',
-      favicon: '/favicon.ico',
     },
   },
 
